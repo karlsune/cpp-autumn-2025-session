@@ -23,6 +23,8 @@ Point food;
 Direction direction;
 int score = 0;
 bool gameOver = false;
+bool isPaused = false;
+int usleepDelay = 100000;
 
 //init ncurses
 
@@ -39,12 +41,17 @@ void setup() {
 //draw game board and elements
 
 void draw() {
-    clear(); //clear screen
+    clear();
     box(stdscr, 0, 0);
 
-    //draw snake
-    for (const auto& p : snake) {
-        mvaddch(p.y, p.x, '#');
+    // Draw the snake's head
+    if (!snake.empty()) {
+        mvaddch(snake.front().y, snake.front().x, 'O'); // 'O' for the head
+    }
+
+    // Draw the rest of the snake's body
+    for (size_t i = 1; i < snake.size(); ++i) {
+        mvaddch(snake[i].y, snake[i].x, 'o'); // 'o' for the body
     }
 
     //draw food
@@ -52,6 +59,11 @@ void draw() {
 
     //display score
     mvprintw(0, 3, "Score %d", score);
+
+    if (isPaused) {
+        mvprintw(MAX_Y / 2, MAX_X / 2 - 6, "GAME PAUSED");
+    }
+
     refresh();
 }
 
@@ -110,6 +122,9 @@ void update() {
     if (head.y == food.y && head.x == food.x) {
         score += 10;
         generateFood();
+        if (score % 50 == 0) {
+            usleepDelay -= 10000;
+        }
     } else {
         snake.pop_back();
     }
@@ -124,38 +139,70 @@ void input() {
         case KEY_LEFT:  if (direction != RIGHT) direction = LEFT; break;
         case KEY_RIGHT: if (direction != LEFT) direction = RIGHT; break;
         case 'q':       gameOver = true; break;
+        case 'p':       isPaused = !isPaused; break;
     }
+}
+
+void resetGame() {
+
+    snake.clear();
+    //initial snake position and direction
+    snake.push_back({MAX_Y / 2, MAX_X / 2});
+    direction = RIGHT;
+    score = 0;
+    gameOver = false;
+    isPaused = false;
+    usleepDelay = 100000;
+    //init food
+    generateFood();
 }
 
 //main loop
 int main() {
     setup();
+    bool playing = true;
 
-    //initial snake position and direction
-    snake.push_back({MAX_Y / 2, MAX_X / 2});
-    direction = RIGHT;
+    while (playing) {
+        //function to reset variables and init new game
+        resetGame();
 
-    //init food
-    generateFood();
 
-    //main loop
-    while (!gameOver) {
-        draw();
-        input();
-        update();
-        usleep(100000);
+        //main loop
+        while (!gameOver) {
+            draw();
+            input();
+
+            if (!isPaused) {
+                update();
+            }
+
+            usleep(usleepDelay);
+        }
+
+        bool choiceMade = false;
+        while (!choiceMade) {
+            //game over screen
+            clear();
+            mvprintw(MAX_Y / 2, MAX_X / 2 - 10, "Game Over ! Final Score : %d", score);
+            mvprintw(MAX_Y / 2, MAX_X / 2 - 15, "Press 'r' to restart or 'q' to quit");
+            refresh();
+
+            int ch = getch();
+            if (ch == 'q') {
+                playing = false;
+                choiceMade = true;
+            } else if (ch == 'r') {
+                gameOver = false;
+                choiceMade = true;
+            }
+        }
     }
-
-    //game over screen
-    clear();
-    mvprintw(MAX_Y / 2, MAX_X / 2 - 10, "Game Over ! Final Score : %d", score);
-    refresh();
-    sleep(3);
-
     //end ncurses mode
     endwin();
     return 0;
 }
+
+
 
 
 
